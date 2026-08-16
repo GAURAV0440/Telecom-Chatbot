@@ -2,9 +2,6 @@
 .env
 __pycache__/
 *.pyc
+.pytest_cache/
 backend/data/qdrant/
 backend/data/documents/
-.pytest_cache/
-
-backend/data/processed/
-backend/data/qdrant/

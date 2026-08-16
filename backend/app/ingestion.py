@@ -1,5 +1,7 @@
 from pathlib import Path
 import json
+import re
+
 from docx import Document
 from docx.document import Document as _Document
 from docx.table import Table
@@ -11,25 +13,19 @@ from docx.oxml.table import CT_Tbl
 MAX_CHARS = 4000
 OVERLAP_CHARS = 400
 
+DOCUMENT_PATH = Path("backend/data/documents/36413-j20.docx")
+OUTPUT_PATH = Path("backend/data/processed/ts_36_413_chunks.json")
 
-def iter_block_items(parent):
-    """
-    Yield paragraphs and tables in their original DOCX order.
-    """
-    if isinstance(parent, _Document):
-        parent_element = parent.element.body
-    else:
-        parent_element = parent._tc
 
-    for child in parent_element.iterchildren():
+def iter_block_items(document):
+    for child in document.element.body.iterchildren():
         if isinstance(child, CT_P):
-            yield Paragraph(child, parent)
+            yield Paragraph(child, document)
         elif isinstance(child, CT_Tbl):
-            yield Table(child, parent)
+            yield Table(child, document)
 
 
 def table_to_text(table: Table) -> str:
-    """Convert a DOCX table into readable text."""
     rows = []
 
     for row in table.rows:
@@ -51,18 +47,41 @@ def table_to_text(table: Table) -> str:
     return "\n".join(rows)
 
 
-def extract_blocks(file_path: str) -> list[dict]:
-    path = Path(file_path)
+def extract_metadata(document: Document) -> dict:
+    text = "\n".join(
+        paragraph.text.strip()
+        for paragraph in document.paragraphs[:20]
+        if paragraph.text.strip()
+    )
 
-    if not path.exists():
-        raise FileNotFoundError(f"Document not found: {path}")
+    match = re.search(
+        r"3GPP\s+TS\s+(\d+\.\d+)\s+V(\d+\.\d+\.\d+)",
+        text,
+        re.IGNORECASE,
+    )
 
-    document = Document(path)
+    if not match:
+        raise ValueError("Could not identify specification and version.")
+
+    release_match = re.search(
+        r"\(Release\s+(\d+)\)",
+        text,
+        re.IGNORECASE,
+    )
+
+    return {
+        "specification": f"TS {match.group(1)}",
+        "version": f"V{match.group(2)}",
+        "release": release_match.group(1) if release_match else "unknown",
+        "source_file": DOCUMENT_PATH.name,
+    }
+
+
+def extract_blocks(document: Document) -> tuple[list[dict], dict]:
+    metadata = extract_metadata(document)
 
     blocks = []
     started = False
-    paragraph_count = 0
-    table_count = 0
 
     for block in iter_block_items(document):
 
@@ -74,55 +93,38 @@ def extract_blocks(file_path: str) -> list[dict]:
 
             style = block.style.name if block.style else "Normal"
 
-            # Ignore cover/TOC material before Foreword.
-            if text == "Foreword" and style == "Heading 1":
+            if text.lower() == "foreword" and style == "Heading 1":
                 started = True
 
             if not started:
                 continue
 
-            blocks.append(
-                {
-                    "type": "paragraph",
-                    "text": text,
-                    "style": style,
-                    "index": paragraph_count,
-                }
-            )
-
-            paragraph_count += 1
+            blocks.append({
+                "text": text,
+                "style": style,
+            })
 
         elif isinstance(block, Table):
+
             if not started:
                 continue
 
             text = table_to_text(block)
 
-            if not text.strip():
-                continue
-
-            blocks.append(
-                {
-                    "type": "table",
+            if text.strip():
+                blocks.append({
                     "text": text,
                     "style": "Table",
-                    "index": table_count,
-                }
-            )
+                })
 
-            table_count += 1
-
-    print(f"Paragraph blocks processed: {paragraph_count}")
-    print(f"Table blocks processed: {table_count}")
-
-    return blocks
+    return blocks, metadata
 
 
 def is_heading(style: str) -> bool:
     return style.startswith("Heading ")
 
 
-def get_heading_level(style: str) -> int:
+def heading_level(style: str) -> int:
     try:
         return int(style.split()[-1])
     except (ValueError, IndexError):
@@ -131,20 +133,17 @@ def get_heading_level(style: str) -> int:
 
 def build_chunks(blocks: list[dict]) -> list[dict]:
     chunks = []
+    heading_stack = {}
+    current_content = []
 
-    heading_stack: dict[int, str] = {}
-    current_content: list[str] = []
-
-    def flush_content():
-        nonlocal current_content
-
+    def flush():
         if not current_content:
             return
 
         text = "\n".join(current_content).strip()
 
         if not text:
-            current_content = []
+            current_content.clear()
             return
 
         start = 0
@@ -159,28 +158,26 @@ def build_chunks(blocks: list[dict]) -> list[dict]:
                     for level in sorted(heading_stack)
                 )
 
-                chunks.append(
-                    {
-                        "text": chunk_text,
-                        "section_path": section_path,
-                    }
-                )
+                chunks.append({
+                    "text": chunk_text,
+                    "section_path": section_path,
+                })
 
             if end >= len(text):
                 break
 
             start = end - OVERLAP_CHARS
 
-        current_content = []
+        current_content.clear()
 
     for block in blocks:
         text = block["text"]
         style = block["style"]
 
         if is_heading(style):
-            flush_content()
+            flush()
 
-            level = get_heading_level(style)
+            level = heading_level(style)
 
             for existing_level in list(heading_stack):
                 if existing_level >= level:
@@ -191,43 +188,46 @@ def build_chunks(blocks: list[dict]) -> list[dict]:
         else:
             current_content.append(text)
 
-    flush_content()
+    flush()
 
     return chunks
 
 
-def process_document(file_path: str) -> list[dict]:
-    blocks = extract_blocks(file_path)
+def process_document() -> list[dict]:
+    if not DOCUMENT_PATH.exists():
+        raise FileNotFoundError(
+            f"Document not found: {DOCUMENT_PATH}"
+        )
+
+    document = Document(DOCUMENT_PATH)
+
+    blocks, metadata = extract_blocks(document)
     chunks = build_chunks(blocks)
 
-    metadata = {
-        "specification": "TS 36.413",
-        "version": "V19.2.0",
-        "release": "19",
-        "source_file": Path(file_path).name,
-    }
-
-    for index, chunk in enumerate(chunks):
-        chunk["chunk_id"] = index
-        chunk["specification"] = metadata["specification"]
-        chunk["version"] = metadata["version"]
-        chunk["release"] = metadata["release"]
-        chunk["source_file"] = metadata["source_file"]
+    for chunk_id, chunk in enumerate(chunks):
+        chunk.update({
+            "chunk_id": chunk_id,
+            "specification": metadata["specification"],
+            "version": metadata["version"],
+            "release": metadata["release"],
+            "source_file": metadata["source_file"],
+        })
 
     return chunks
 
 
 if __name__ == "__main__":
-    document_path = "backend/data/documents/36413-j20.docx"
+    chunks = process_document()
 
-    chunks = process_document(document_path)
+    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-    output_path = Path("backend/data/processed/ts_36_413_chunks.json")
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    with output_path.open("w", encoding="utf-8") as file:
-        json.dump(chunks, file, ensure_ascii=False, indent=2)
+    with OUTPUT_PATH.open("w", encoding="utf-8") as file:
+        json.dump(
+            chunks,
+            file,
+            ensure_ascii=False,
+            indent=2,
+        )
 
     print(f"Total chunks: {len(chunks)}")
-    print(f"Saved to: {output_path}")
+    print(f"Saved to: {OUTPUT_PATH}")

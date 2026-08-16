@@ -18,3 +18,5 @@ httpx
 pytest
 pytest-asyncio
 python-docx
+
+groq

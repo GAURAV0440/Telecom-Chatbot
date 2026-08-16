@@ -1,17 +1,37 @@
 from fastapi import FastAPI
+from pydantic import BaseModel
 
-from backend.app.config import settings
+from backend.app.rag import ask
 
 
 app = FastAPI(
-    title=settings.app_name,
+    title="3GPP Standards RAG Assistant",
     version="1.0.0",
 )
 
 
+class ChatRequest(BaseModel):
+    question: str
+
+
+class ChatResponse(BaseModel):
+    answer: str
+    evidence: list[dict]
+
+
 @app.get("/health")
-def health_check():
+def health():
     return {
         "status": "ok",
-        "service": settings.app_name,
+        "service": "3GPP Standards RAG Assistant",
+    }
+
+
+@app.post("/chat", response_model=ChatResponse)
+def chat(request: ChatRequest):
+    result = ask(request.question)
+
+    return {
+        "answer": result["answer"],
+        "evidence": result["evidence"],
     }

@@ -1,0 +1,102 @@
+[
+  {
+    "question": "What services does S1AP provide?",
+    "expected": "answer"
+  },
+  {
+    "question": "What is E-RAB setup in S1AP?",
+    "expected": "answer"
+  },
+  {
+    "question": "Explain the S1AP handover preparation procedure.",
+    "expected": "answer"
+  },
+  {
+    "question": "What is the purpose of the S1AP Reset procedure?",
+    "expected": "answer"
+  },
+  {
+    "question": "What is the difference between UE-associated and non UE-associated services?",
+    "expected": "answer"
+  },
+  {
+    "question": "What is the purpose of the S1 Setup procedure?",
+    "expected": "answer"
+  },
+  {
+    "question": "What is the purpose of the Initial Context Setup procedure?",
+    "expected": "answer"
+  },
+  {
+    "question": "What is the purpose of the E-RAB Release procedure?",
+    "expected": "answer"
+  },
+  {
+    "question": "What is the purpose of the Handover Cancel procedure?",
+    "expected": "answer"
+  },
+  {
+    "question": "What is the purpose of the Error Indication procedure?",
+    "expected": "answer"
+  },
+  {
+    "question": "What is the purpose of the Paging procedure?",
+    "expected": "answer"
+  },
+  {
+    "question": "What does the E-RAB SETUP REQUEST message contain?",
+    "expected": "answer"
+  },
+  {
+    "question": "What is the purpose of the E-RAB SETUP RESPONSE message?",
+    "expected": "answer"
+  },
+  {
+    "question": "What does the S1AP signalling connection provide?",
+    "expected": "answer"
+  },
+  {
+    "question": "What is the purpose of the Handover Preparation procedure?",
+    "expected": "answer"
+  },
+  {
+    "question": "What is the capital of France?",
+    "expected": "refuse"
+  },
+  {
+    "question": "Who is the current Prime Minister of India?",
+    "expected": "refuse"
+  },
+  {
+    "question": "Explain Python decorators.",
+    "expected": "refuse"
+  },
+  {
+    "question": "What is the weather in Delhi today?",
+    "expected": "refuse"
+  },
+  {
+    "question": "What is NGAP?",
+    "expected": "refuse"
+  },
+  {
+    "question": "What is 5G NAS?",
+    "expected": "refuse"
+  },
+  {
+    "question": "Explain LTE physical layer procedures.",
+    "expected": "refuse"
+  },
+  {
+    "question": "What is the difference between S1AP and NGAP?",
+    "expected": "refuse"
+  },
+  {
+    "question": "Explain how TCP congestion control works.",
+    "expected": "refuse"
+  },
+  {
+    "question": "Who is the CEO of Mavenir?",
+    "expected": "refuse"
+  }
+]

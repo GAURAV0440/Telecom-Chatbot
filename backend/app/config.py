@@ -4,8 +4,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_name: str = "3GPP Standards RAG Assistant"
 
-    gemini_api_key: str
-    gemini_model: str = "gemini-2.5-flash"
+    groq_api_key: str
+    groq_model: str = "llama-3.3-70b-versatile"
 
     embedding_model: str = "BAAI/bge-small-en-v1.5"
 
