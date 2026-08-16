@@ -1,6 +1,10 @@
 # 3GPP Standards RAG Chatbot
 
-AI-powered Retrieval-Augmented Generation (RAG) chatbot focused on Telecom 3GPP standards, designed to minimize hallucinations through evidence-grounded generation and strict retrieval filtering.
+This project is a chatbot that answers questions from an indexed 3GPP standards document.
+
+It is designed to minimize hallucinations by forcing answers to be based on retrieved evidence.
+
+Repository: https://github.com/GAURAV0440/Telecom-Chatbot
 
 ## 1. Project Title
 
@@ -8,122 +12,207 @@ AI-powered Retrieval-Augmented Generation (RAG) chatbot focused on Telecom 3GPP 
 
 ## 2. Short Professional Description
 
-This project implements a production-style RAG assistant that answers questions only from indexed 3GPP documentation. The current indexed standard is TS 36.413 V19.2.0. The system combines hybrid retrieval (semantic + lexical), scope gating, and evidence-only answer generation to reduce unsupported responses.
+This is an AI assistant for telecom standards Q&A.
+
+- Current indexed document: TS 36.413 V19.2.0
+- Knowledge scope: only indexed 3GPP content
+- Refusal behavior: rejects unsupported questions with a fixed message
 
 ## 3. Key Features
 
-- Hybrid retrieval using semantic search and BM25 lexical search.
-- Explicit in-scope/out-of-scope query handling before generation.
-- Evidence filtering thresholds before sending context to the LLM.
-- Evidence-only LLM prompting with refusal behavior for insufficient evidence.
-- Source-aware responses including specification, version, and section path from retrieved evidence.
-- FastAPI backend with a chat endpoint and Streamlit chat frontend.
-- Built-in retrieval and LLM evaluation scripts.
+- Answers from indexed 3GPP evidence only
+- Hybrid retrieval (semantic + lexical)
+- Explicit out-of-scope rejection
+- Evidence filtering before LLM generation
+- Source metadata in responses (specification, version, section)
+- FastAPI backend and Streamlit frontend
+- Retrieval and LLM evaluation scripts
 
 ## 4. Problem Statement
 
-Generic LLM chatbots can hallucinate domain facts when asked technical telecom questions. For standards-heavy workflows, answers must be traceable to source text. The goal of this project is to answer telecom questions from 3GPP standards while rejecting unsupported or unrelated queries.
+Large language models can produce confident but unsupported answers.
+
+For standards work, answers must be traceable to source text. This project was built to answer standards questions while rejecting unsupported or unrelated questions.
 
 ## 5. Solution Overview
 
-The assistant uses a RAG architecture where answer generation is conditioned on retrieved chunks from indexed 3GPP content. If no sufficiently relevant evidence is found, the system refuses with a fixed response:
+The chatbot uses RAG.
+
+RAG (Retrieval-Augmented Generation) means:
+
+1. First, the system retrieves relevant text from indexed documents.
+2. Then, it generates an answer using only that retrieved text.
+
+If evidence is not sufficient, it returns:
 
 I don't have sufficient evidence in the provided 3GPP standards.
 
+## Quick Start
+
+Use these steps in order from a fresh clone.
+
+1. Clone the repository
+
+```bash
+git clone https://github.com/GAURAV0440/Telecom-Chatbot.git
+```
+
+2. Enter the project directory
+
+```bash
+cd Telecom-Chatbot
+```
+
+3. Create a Python virtual environment
+
+```bash
+python -m venv .venv
+```
+
+4. Activate it
+
+```bash
+source .venv/bin/activate
+```
+
+5. Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+6. Create your environment file
+
+```bash
+cp .env.example .env
+```
+
+7. Edit .env and set GROQ_API_KEY
+
+8. ZIP/database setup
+   - The repository already includes ready-to-use processed and indexed retrieval data.
+   - You can run the app directly after configuring .env.
+   - Details are in the ZIP section below.
+
+9. Start backend in Terminal 1
+
+```bash
+uvicorn backend.app.main:app --reload
+```
+
+10. Start frontend in Terminal 2
+
+```bash
+streamlit run frontend/app.py
+```
+
+11. Open the frontend URL shown by Streamlit (usually http://localhost:8501)
+
+12. Ask a test question
+   - What is the purpose of the S1AP Reset procedure?
+
 ## 6. Architecture
 
-~~~mermaid
+```mermaid
 flowchart TD
-		A[3GPP Document] --> B[Document Processing and Chunking]
-		B --> C[Text Embeddings via FastEmbed]
-		C --> D[Qdrant Vector Index]
-		B --> E[BM25 Lexical Index]
-		D --> F[Hybrid Retrieval]
-		E --> F
-		F --> G[Scope and Relevance Filtering]
-		G --> H[Retrieved 3GPP Evidence]
-		H --> I[Groq LLM with Evidence-only Prompting]
-		I --> J[Grounded Answer + Source References]
-~~~
+    A[3GPP document] --> B[Chunking]
+    B --> C[Embeddings using FastEmbed]
+    C --> D[Qdrant vector index]
+    B --> E[BM25 lexical index]
+    D --> F[Hybrid retrieval]
+    E --> F
+    F --> G[Scope and relevance filtering]
+    G --> H[Evidence]
+    H --> I[Groq LLM]
+    I --> J[Grounded answer with source references]
+```
 
 ## 7. RAG Pipeline
 
-1. A standards document is parsed and chunked.
-2. Chunks are embedded with BAAI/bge-small-en-v1.5.
-3. Embeddings are indexed in Qdrant.
-4. BM25 lexical scoring is built from chunk text.
-5. For each user query, semantic and lexical candidates are merged.
-6. Scope checks and relevance thresholds select final evidence.
-7. Groq generates an answer only from selected evidence.
-8. If evidence is insufficient, the model returns the fixed refusal message.
+Simple pipeline flow:
+
+1. The document is split into chunks.
+2. Each chunk is converted into embeddings.
+   - Embeddings are numeric representations of text meaning.
+3. Embeddings are stored in Qdrant.
+   - Qdrant is a vector database used for similarity search.
+4. BM25 lexical retrieval is also used.
+   - BM25 is a keyword matching method.
+5. The system combines semantic + lexical results.
+6. Filtering removes weak or out-of-scope evidence.
+7. The LLM answers from the filtered evidence.
+8. If evidence is weak, the system refuses.
 
 ## 8. Retrieval Strategy
 
-The retrieval layer is implemented as hybrid retrieval:
+Hybrid retrieval combines two methods:
 
 - Semantic retrieval:
-	- FastEmbed
-	- Model: BAAI/bge-small-en-v1.5
-	- Vector store: Qdrant
+  - FastEmbed
+  - Model: BAAI/bge-small-en-v1.5
+  - Vector store: Qdrant
 - Lexical retrieval:
-	- BM25 via rank-bm25
+  - BM25 via rank-bm25
 
-Evidence candidates are ranked using weighted semantic score, normalized BM25 score, lexical overlap, and technical phrase matching. Final evidence must satisfy relevance conditions before being passed to answer generation.
+Why both are used:
 
-The retrieval layer also includes:
+- Semantic search helps with meaning-level matches.
+- BM25 helps with exact terms and protocol keywords.
+- Combined scoring improves evidence quality.
+
+Additional checks in retrieval:
 
 - Scope checking
 - Semantic score filtering
 - Hybrid score filtering
 - Lexical overlap filtering
-- Technical phrase matching gates
+- Technical phrase matching checks
 
 ## 9. Hallucination Mitigation
 
-This system is designed to reduce hallucinations, not to guarantee zero hallucinations.
+This project is designed to minimize hallucinations, not guarantee zero hallucinations.
 
-Implemented mechanisms:
+Implemented controls:
 
-1. Restricted knowledge source
-	 - Evidence is retrieved from indexed 3GPP documentation only.
+1. Restricted source
+   - Retrieval is from indexed 3GPP content only.
 2. Scope filtering
-	 - Known out-of-scope topics are explicitly rejected before answer generation.
+   - Known out-of-scope topics are rejected.
 3. Hybrid retrieval
-	 - Semantic + BM25 retrieval improves evidence matching quality.
+   - Semantic + lexical retrieval improves evidence matching.
 4. Evidence thresholds
-	 - Chunks must pass relevance conditions to be considered valid evidence.
+   - Low-quality matches are filtered out.
 5. Evidence-only prompting
-	 - The LLM is instructed to answer only from retrieved evidence.
-6. Refusal behavior
-	 - If evidence is missing or insufficient, a fixed refusal response is returned.
-7. Source citations
-	 - Answers are constrained to specification/version/section data present in retrieved evidence.
+   - LLM is instructed to use only provided evidence.
+6. Fixed refusal message
+   - Used when evidence is missing or insufficient.
+7. Source-aware output
+   - Evidence includes specification/version/section metadata.
 
 ## 10. Technology Stack
 
 | Layer | Technology |
 |---|---|
-| Backend API | FastAPI |
 | Language | Python |
+| Backend API | FastAPI |
 | Frontend | Streamlit |
 | Embeddings | FastEmbed |
-| Embedding Model | BAAI/bge-small-en-v1.5 |
-| Vector Database | Qdrant (local path mode) |
-| Lexical Retrieval | rank-bm25 |
-| LLM Provider | Groq |
-| Data Parsing | python-docx |
-| Validation/Settings | Pydantic, pydantic-settings |
+| Embedding model | BAAI/bge-small-en-v1.5 |
+| Vector database | Qdrant (local path mode) |
+| Lexical retrieval | rank-bm25 |
+| LLM provider | Groq |
+| Document parsing | python-docx |
+| Config and validation | pydantic, pydantic-settings |
 
 ## 11. Project Structure
 
-~~~text
+```text
 3gpp-rag-chatbot/
 ├── LICENSE
 ├── README.md
 ├── requirements.txt
 ├── backend/
 │   ├── app/
-│   │   ├── __init__.py
 │   │   ├── config.py
 │   │   ├── evaluate.py
 │   │   ├── ingestion.py
@@ -139,130 +228,98 @@ Implemented mechanisms:
 │   └── tests/
 │       └── evaluation_questions.json
 └── frontend/
-		└── app.py
-~~~
+    └── app.py
+```
 
-Component responsibilities:
+Main responsibilities:
 
-- backend/app/ingestion.py
-	- Parses the source document and builds structured chunks with metadata.
-- backend/app/vector_store.py
-	- Embeds chunks and indexes them into Qdrant.
-- backend/app/retrieval.py
-	- Performs scope detection, hybrid retrieval, scoring, and evidence filtering.
-- backend/app/llm.py
-	- Builds evidence-only prompts and generates answers with Groq.
-- backend/app/rag.py
-	- Orchestrates retrieval + generation and refusal behavior.
 - backend/app/main.py
-	- Exposes API endpoints including POST /chat.
+  - FastAPI app and chat endpoint.
+- backend/app/rag.py
+  - Retrieval + answer orchestration.
+- backend/app/retrieval.py
+  - Hybrid search and filtering logic.
+- backend/app/llm.py
+  - Groq prompt and response generation.
 - backend/app/evaluate.py
-	- Runs retrieval and LLM evaluation.
+  - Retrieval and LLM evaluation runner.
 - frontend/app.py
-	- Streamlit chat UI showing answers and retrieved 3GPP sources.
+  - Chat UI.
 
 ## 12. Installation
 
-1. Clone the repository and move to the project root.
-2. Create and activate a Python virtual environment.
-3. Install dependencies.
-
-~~~bash
+```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-~~~
+```
 
 ## 13. Environment Configuration
 
-Create a .env file in the project root.
+Create .env from .env.example:
 
-~~~bash
+```bash
 cp .env.example .env
-~~~
+```
 
-Set the required values (at minimum GROQ_API_KEY). Example safe template:
+Set at least these values:
 
-~~~env
-APP_NAME=3GPP Standards RAG Assistant
-
+```env
 GROQ_API_KEY=YOUR_GROQ_API_KEY
 GROQ_MODEL=llama-3.3-70b-versatile
 
 EMBEDDING_MODEL=BAAI/bge-small-en-v1.5
-
 QDRANT_PATH=./backend/data/qdrant
 QDRANT_COLLECTION=3gpp_documents
+```
 
-TOP_K=10
-BM25_TOP_K=10
-SIMILARITY_THRESHOLD=0.65
-~~~
+Important:
+
+- Keep .env private.
+- Do not commit API keys.
 
 ## 14. Running the Backend
 
-Before serving the API, ensure chunks and vector index are prepared:
+Terminal 1:
 
-~~~bash
-python -m backend.app.ingestion
-python -m backend.app.vector_store
-~~~
-
-Start FastAPI:
-
-~~~bash
+```bash
+source .venv/bin/activate
 uvicorn backend.app.main:app --reload
-~~~
+```
+
+Optional health check:
+
+```bash
+curl http://127.0.0.1:8000/health
+```
 
 ## 15. Running the Frontend
 
-Run the Streamlit chatbot UI:
+Terminal 2:
 
-~~~bash
+```bash
+source .venv/bin/activate
 streamlit run frontend/app.py
-~~~
-
-The frontend calls the backend chat API at:
-
-http://127.0.0.1:8000/chat
+```
 
 ## 16. API Usage
 
-Primary endpoint:
+Endpoint:
 
 - POST /chat
 
-Request body:
+Request example:
 
-~~~json
+```json
 {
-	"question": "What is the purpose of the S1AP Reset procedure?"
+  "question": "What is the purpose of the S1AP Reset procedure?"
 }
-~~~
+```
 
-Response shape:
+Response contains:
 
-~~~json
-{
-	"answer": "...",
-	"evidence": [
-		{
-			"chunk_id": 0,
-			"text": "...",
-			"section_path": "...",
-			"specification": "TS 36.413",
-			"version": "V19.2.0",
-			"release": "...",
-			"source_file": "...",
-			"semantic_score": 0.0,
-			"bm25_score": 0.0,
-			"lexical_overlap": 0.0,
-			"technical_phrase_score": 0.0,
-			"hybrid_score": 0.0
-		}
-	]
-}
-~~~
+- answer
+- evidence
 
 ## 17. Example Questions
 
@@ -270,19 +327,18 @@ In-scope examples:
 
 - What services does S1AP provide?
 - What is E-RAB setup in S1AP?
-- What is the purpose of the S1AP Reset procedure?
 - Explain the S1AP handover preparation procedure.
 - What does the E-RAB SETUP REQUEST message contain?
 
 Out-of-scope examples:
 
 - What is the capital of France?
-- Who is the Prime Minister of India?
+- Who is the current Prime Minister of India?
 - Explain Python decorators.
 - What is NGAP?
 - What is 5G NAS?
 - What is the weather in Delhi today?
-- Explain TCP congestion control.
+- Explain how TCP congestion control works.
 
 Out-of-scope response:
 
@@ -290,87 +346,105 @@ I don't have sufficient evidence in the provided 3GPP standards.
 
 ## 18. Evaluation
 
-Evaluation dataset:
+Evaluation set:
 
 - 25 total questions
-- 15 in-scope 3GPP questions
-- 10 out-of-scope questions
+- 15 in-scope
+- 10 out-of-scope
 
 Run retrieval evaluation:
 
-~~~bash
+```bash
 python -m backend.app.evaluate --retrieval-only
-~~~
+```
 
-Run LLM spot evaluation (limited sample):
+Run LLM spot evaluation:
 
-~~~bash
+```bash
 python -m backend.app.evaluate --llm --limit 3
-~~~
+```
 
 ## 19. Evaluation Results
 
-- Retrieval evaluation: 25/25 tests passed, 100.0%
-- LLM spot evaluation: 3/3 on the tested sample
+- Retrieval evaluation: 25/25, 100.0%
+- LLM spot evaluation: 3/3 on tested sample
 
-Important interpretation:
+How to interpret this:
 
-- Retrieval results are from the full 25-question set.
-- LLM result is a limited spot check and should not be interpreted as full-distribution LLM accuracy.
+- Retrieval result is from the full 25-question set.
+- LLM result is only a small sample and is not a full LLM accuracy claim.
+
+## ZIP / Database Setup (Important)
+
+This repository currently includes these relevant files/folders:
+
+- ZIP file: backend/data/documents/36413-j20.zip
+- Document file: backend/data/documents/36413-j20.docx
+- Processed chunks: backend/data/processed/ts_36_413_chunks.json
+- Local Qdrant index: backend/data/qdrant/
+
+What the ZIP is used for:
+
+- The ZIP in backend/data/documents is a document archive.
+- The app runtime retrieval depends on processed chunks and the Qdrant index paths above.
+
+Practical fresh-clone setup:
+
+- For normal usage, start directly with the included processed/indexed data.
+- You do not need to run ingestion or vector indexing to use the chatbot.
+
+If you still want to extract the ZIP manually:
+
+```bash
+unzip backend/data/documents/36413-j20.zip -d backend/data/documents/
+```
+
+After extraction, confirm these exist:
+
+- backend/data/documents/36413-j20.docx
+- backend/data/processed/ts_36_413_chunks.json
+- backend/data/qdrant/meta.json
+- backend/data/qdrant/collection/3gpp_documents/storage.sqlite
 
 ## 20. Limitations
 
-- Current retrieval scope is tuned to the indexed TS 36.413 content.
-- Out-of-scope detection is rule-based and depends on the configured term sets.
-- LLM quality still depends on evidence quality and API availability.
-- LLM evaluation currently uses a small sample to control API usage and rate limits.
+- Retrieval scope is tuned to the indexed TS 36.413 document.
+- Out-of-scope detection is rule-based.
+- LLM outputs depend on available evidence and API availability.
+- LLM evaluation currently uses a limited sample.
 
 ## 21. Future Improvements
 
-- Expand indexed standards coverage beyond the current scope.
-- Add broader automated LLM evaluation with controlled cost/rate-limit strategy.
-- Add stronger observability for retrieval and generation diagnostics.
-- Add API and retrieval tests integrated into CI workflows.
+- Add more indexed 3GPP standards.
+- Expand LLM evaluation coverage.
+- Add broader automated testing and observability.
 
 ## 22. Security / API Key Handling
 
 - Store secrets only in .env.
-- Never commit .env or real API keys to Git.
-- Rotate API keys if exposure is suspected.
+- Never commit .env.
+- Never commit real API keys.
 
 ## 23. Technical Design Decisions
 
 Why RAG:
 
-- Directly grounds responses in standards evidence instead of relying on parametric memory.
+- It grounds generation in retrieved document evidence.
 
-Why hybrid retrieval (semantic + BM25):
+Why hybrid retrieval:
 
-- Semantic retrieval captures meaning-level similarity.
-- BM25 improves lexical precision for protocol terms and exact phrases.
-- Combined scoring improves robustness over either method alone.
+- Semantic search finds meaning-level matches.
+- BM25 strengthens exact keyword matching.
 
-Why evidence thresholds:
+Why filtering thresholds:
 
-- Prevents weakly related chunks from reaching answer generation.
+- They reduce weak evidence before generation.
 
 Why refusal behavior:
 
-- Avoids unsupported answers when evidence is missing or insufficient.
-
-Why source citations:
-
-- Improves traceability and reviewability for technical answers.
+- It avoids unsupported answers when evidence is insufficient.
 
 Why Groq:
 
-- Provides the hosted LLM endpoint used for answer generation in this implementation.
+- It is the LLM provider used by this implementation.
 
-## 24. Interview Discussion Points
-
-- How scope gating is implemented before retrieval and why this reduces irrelevant generations.
-- How semantic, BM25, lexical overlap, and technical phrase features are combined.
-- Trade-offs in threshold tuning for precision vs recall in evidence selection.
-- Prompt constraints used to enforce evidence-only answering and refusal behavior.
-- How to scale from single-standard indexing to multi-standard coverage while preserving grounding.
-- How to design broader LLM evaluation without over-consuming API quota.
